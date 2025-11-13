@@ -174,7 +174,6 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
      * @param amount 质押金额
      */
     function deposit(uint pid, uint256 amount) public whenNotPaused checkPid(pid) returns (bool) {
-        require(pid > 0 && pid < _pool.length, "not exists pid");
         // 异常处理: 质押数量低于最小质押要求时拒绝交易。
         Pool storage pool = _pool[pid];
         // require(amount > pool.minDepositAmount, "AmountTooSmall");
@@ -199,7 +198,7 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
         // 更新池奖励因子信息
         updatePool(_pid);
         
-        // 1 计算未领取奖励（以上次结算的质押数，与新的奖励因子（将新的池中） - 上一个检查点我应该获得奖励）
+        // 1 计算未领取奖励
         if (user.stAmount > 0) {
             // 计算用户奖励（池每个质押获得的奖励因子已更新）; 去除缩放因子
             uint256 accSt = user.stAmount * (pool.accRewardTokenPerST) / (1 ether);
@@ -239,7 +238,6 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
         updatePool(pid);
 
         // 计算待提取奖励
-        // TODO : 在质押时，计算user.finishedRewardToken时累加了，但是未发送请求，为什么？
         uint256 pendingRewardToken = user.stAmount * pool.accRewardTokenPerST / (1 ether) - user.finishedRewardToken;
         if (pendingRewardToken > 0) {
             user.pendingRewardToken += pendingRewardToken;
