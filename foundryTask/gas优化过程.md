@@ -1,4 +1,6 @@
 初始代码
+
+```solidity
 function add(int256 a, int256 b) public pure returns (int256 res) {
     return res = a + b;
 }
@@ -6,19 +8,13 @@ function add(int256 a, int256 b) public pure returns (int256 res) {
 function sub(int256 a, int256 b) public pure returns (int256 res) {
     return res = a - b;
 }
+```
+
+
 
 gas报告
-forge test --match-contract Calculator --gas-report
-[⠊] Compiling...
-No files changed, compilation skipped
 
-Ran 4 tests for test/Calculator.t.sol:CalculatorTest
-[PASS] testFuzz_Add(int256,int256) (runs: 257, μ: 23660, ~: 23217)
-[PASS] testFuzz_Sub(int256,int256) (runs: 256, μ: 23615, ~: 23180)
-[PASS] test_Add() (gas: 6952)
-[PASS] test_Sub() (gas: 6927)
-Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 291.40ms (357.79ms CPU time)
-
+```
 ╭----------------------------------------+-----------------+-----+--------+-----+---------╮
 | src/Calculator.sol:Calculator Contract |                 |     |        |     |         |
 +=========================================================================================+
@@ -34,8 +30,13 @@ Suite result: ok. 4 passed; 0 failed; 0 skipped; finished in 291.40ms (357.79ms 
 |----------------------------------------+-----------------+-----+--------+-----+---------|
 | sub                                    | 985             | 985 | 985    | 985 | 257     |
 ╰----------------------------------------+-----------------+-----+--------+-----+---------
+```
+
+
 
 第一次优化，返回值不使用变量
+
+```solidity
 function add(int256 a, int256 b) public pure returns (int256) {
     return a + b;
 }
@@ -43,8 +44,15 @@ function add(int256 a, int256 b) public pure returns (int256) {
 function sub(int256 a, int256 b) public pure returns (int256) {
     return a - b;
 }
+```
+
+
+
+
 
 gas报告
+
+```
 ╭----------------------------------------+-----------------+-----+--------+-----+---------╮
 | src/Calculator.sol:Calculator Contract |                 |     |        |     |         |
 +=========================================================================================+
@@ -60,9 +68,16 @@ gas报告
 |----------------------------------------+-----------------+-----+--------+-----+---------|
 | sub                                    | 985             | 985 | 985    | 985 | 257     |
 ╰----------------------------------------+-----------------+-----+--------+-----+---------╯
+```
+
+
+
+
 没有任何提升。
 
 第二次优化，汇编优化
+
+```solidity
 function add(int256 a, int256 b) public pure returns (int256 res) {
     // return a + b;
     assembly {
@@ -76,8 +91,15 @@ function sub(int256 a, int256 b) public pure returns (int256 res) {
         res := sub(a, b)
     }
 }
+```
+
+
+
+
 
 gas报告
+
+```
 ╭----------------------------------------+-----------------+-----+--------+-----+---------╮
 | src/Calculator.sol:Calculator Contract |                 |     |        |     |         |
 +=========================================================================================+
@@ -93,3 +115,7 @@ gas报告
 |----------------------------------------+-----------------+-----+--------+-----+---------|
 | sub                                    | 769             | 769 | 769    | 769 | 257     |
 ╰----------------------------------------+-----------------+-----+--------+-----+---------╯
+```
+
+
+
