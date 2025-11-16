@@ -11,8 +11,12 @@ import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 
 import "hardhat/console.sol";
 
-contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeable, PausableUpgradeable {
-
+contract MetaNodeStake is
+    Initializable,
+    UUPSUpgradeable,
+    AccessControlUpgradeable,
+    PausableUpgradeable
+{
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -72,7 +76,7 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
 
     // 用户质押信息
     mapping(uint256 pid => mapping(address => User)) private _user;
-    
+
     // 质押池。第一个池固定为ETH,pid: ETH_PID
     Pool[] private _pool;
 
@@ -86,7 +90,11 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
     bool public pauseWithdraw;
 
     // 更新池信息事件
-    event UpdatePool(uint256 indexed pid, uint256 lastRewardBlock, uint256 stTokenRewardToken);
+    event UpdatePool(
+        uint256 indexed pid,
+        uint256 lastRewardBlock,
+        uint256 stTokenRewardToken
+    );
 
     // 质押事件
     event Deposit(uint256 indexed pid, address indexed user, uint256 amount);
@@ -95,7 +103,12 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
     event Unstake(uint256 indexed pid, address indexed user, uint256 amount);
 
     // 提现事件
-    event Withdraw(uint256 indexed pid, address indexed user, uint256 sumWithdraw, uint256 blockNumber);
+    event Withdraw(
+        uint256 indexed pid,
+        address indexed user,
+        uint256 sumWithdraw,
+        uint256 blockNumber
+    );
 
     // 更换奖励币事件
     event SetRewardToken(IERC20 indexed rewardToken);
@@ -108,7 +121,7 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
 
     // 提现开关事件
     event SetPauseWithdraw(bool indexed isPause);
-    
+
     event SetPauseClaim(bool indexed isPause);
 
     event SetStartBlock(uint256 indexed startBlock);
@@ -117,7 +130,11 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
 
     event SetRewardTokenPerBlock(uint256 indexed rewardTokenBlock);
 
-    event SetPoolWeight(uint256 indexed pid, uint256 indexed poolWeight, uint256 totalPoolWeight);
+    event SetPoolWeight(
+        uint256 indexed pid,
+        uint256 indexed poolWeight,
+        uint256 totalPoolWeight
+    );
 
     event Claim(uint256 indexed pid, address user, uint256 peedingToken);
 
@@ -126,12 +143,19 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
         _;
     }
 
-    function initialize(IERC20 metaNode, uint256 startBlock, uint256 endBlock, uint256 metaNodePerBlock) initializer public {
-        require(startBlock <= endBlock && metaNodePerBlock > 0, "invalid parameters");
+    function initialize(
+        IERC20 metaNode,
+        uint256 startBlock,
+        uint256 endBlock,
+        uint256 metaNodePerBlock
+    ) public initializer {
+        require(
+            startBlock <= endBlock && metaNodePerBlock > 0,
+            "invalid parameters"
+        );
         __UUPSUpgradeable_init();
         __AccessControl_init();
         __Pausable_init();
-        
 
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _grantRole(ADMIN_ROLE, _msgSender());
@@ -144,8 +168,11 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
 
         // ETH 池初始化
         // 需要初始化 lastRewardBlock ，后面计算会直接使用。取 max(block.number, _startBlock)
-        uint256 lastRewardBlock = block.number > _startBlock ? block.number : _startBlock;
-        _pool.push(Pool({
+        uint256 lastRewardBlock = block.number > _startBlock
+            ? block.number
+            : _startBlock;
+        _pool.push(
+            Pool({
                 stTokenAddress: address(0),
                 poolWeight: 100,
                 minDepositAmount: 0.1 * (1 ether),
@@ -153,7 +180,8 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
                 lastRewardBlock: lastRewardBlock,
                 accRewardTokenPerST: 0,
                 stTokenAmount: 0
-            }));
+            })
+        );
     }
 
     function depositETH() public payable whenNotPaused returns (bool) {
@@ -162,8 +190,8 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
         uint256 amount = msg.value;
         console.log("amount: ", amount);
         console.log("pool.minDepositAmount: ", pool.minDepositAmount);
-        require(amount > pool.minDepositAmount, "AmountTooSmall");        
-        
+        require(amount > pool.minDepositAmount, "AmountTooSmall");
+
         _deposit(ETH_PID, amount);
         return true;
     }
@@ -173,20 +201,26 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
      * @param pid 池id
      * @param amount 质押金额
      */
-    function deposit(uint pid, uint256 amount) public whenNotPaused checkPid(pid) returns (bool) {
+    function deposit(
+        uint pid,
+        uint256 amount
+    ) public whenNotPaused checkPid(pid) returns (bool) {
         // 异常处理: 质押数量低于最小质押要求时拒绝交易。
         Pool storage pool = _pool[pid];
         // require(amount > pool.minDepositAmount, "AmountTooSmall");
-        
+
         if (amount > 0) {
             // 将质押的代币转移到本合约
-            IERC20(pool.stTokenAddress).safeTransferFrom(_msgSender(), address(this), amount);
+            IERC20(pool.stTokenAddress).safeTransferFrom(
+                _msgSender(),
+                address(this),
+                amount
+            );
         }
-        
+
         _deposit(pid, amount);
         return true;
     }
-
 
     /**
      * 质押
@@ -195,13 +229,21 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
         Pool storage pool = _pool[_pid];
         User storage user = _user[_pid][_msgSender()];
 
+        // console.log("updatePool befor:", pool.accRewardTokenPerST);
+
         // 更新池奖励因子信息
         updatePool(_pid);
-        
+
+        // console.log("updatePool after:", pool.accRewardTokenPerST);
+        // Pool memory temp = _pool[_pid];
+        // console.log("new pool updatePool after:", temp.accRewardTokenPerST);
+
+        // pool.accRewardTokenPerST 读取到的是 updatePool之后的因子（storage）
         // 1 计算未领取奖励
         if (user.stAmount > 0) {
             // 计算用户奖励（池每个质押获得的奖励因子已更新）; 去除缩放因子
-            uint256 accSt = user.stAmount * (pool.accRewardTokenPerST) / (1 ether);
+            uint256 accSt = (user.stAmount * (pool.accRewardTokenPerST)) /
+                (1 ether);
 
             // 减去已获得的奖励
             uint peedingRewardToken = accSt - user.finishedRewardToken;
@@ -217,9 +259,11 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
         pool.stTokenAmount += _amount;
 
         // 3 计算已分配奖励（在当前检查点下，我质押的数量应该获得的奖励）
-        uint256 finishedRewardToken = user.stAmount * (pool.accRewardTokenPerST) / (1 ether);
+        uint256 finishedRewardToken = (user.stAmount *
+            (pool.accRewardTokenPerST)) / (1 ether);
         user.finishedRewardToken = finishedRewardToken;
-
+        console.log("user.pendingRewardToken:", user.pendingRewardToken);
+        console.log("user.finishedRewardToken:", user.finishedRewardToken);
         emit Deposit(_pid, _msgSender(), _amount);
     }
 
@@ -228,7 +272,10 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
      * @param pid 池id
      * @param amount 质押金额
      */
-    function unstake(uint256 pid, uint256 amount) public whenNotPaused checkPid(pid) returns (bool) {
+    function unstake(
+        uint256 pid,
+        uint256 amount
+    ) public whenNotPaused checkPid(pid) returns (bool) {
         User storage user = _user[pid][_msgSender()];
         Pool storage pool = _pool[pid];
 
@@ -238,7 +285,10 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
         updatePool(pid);
 
         // 计算待提取奖励
-        uint256 pendingRewardToken = user.stAmount * pool.accRewardTokenPerST / (1 ether) - user.finishedRewardToken;
+        uint256 pendingRewardToken = (user.stAmount *
+            pool.accRewardTokenPerST) /
+            (1 ether) -
+            user.finishedRewardToken;
         if (pendingRewardToken > 0) {
             user.pendingRewardToken += pendingRewardToken;
         }
@@ -246,16 +296,20 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
         // 将提取请求放入user的请求列表
         if (amount > 0) {
             user.stAmount -= amount;
-            user.requestes.push(Request({
-                amount: amount,
-                unlockBlocks: block.number + pool.unstakeLockedBlocks
-            }));
+            user.requestes.push(
+                Request({
+                    amount: amount,
+                    unlockBlocks: block.number + pool.unstakeLockedBlocks
+                })
+            );
         }
 
         // 更新质押数
         pool.stTokenAmount -= amount;
-        user.finishedRewardToken = user.stAmount * pool.accRewardTokenPerST / (1 ether);
-    
+        user.finishedRewardToken =
+            (user.stAmount * pool.accRewardTokenPerST) /
+            (1 ether);
+
         emit Unstake(pid, _msgSender(), amount);
         return true;
     }
@@ -264,7 +318,9 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
      * 质押提现
      * @param pid 池id
      */
-    function withdraw(uint256 pid) public whenNotPaused checkPid(pid) returns (bool) {
+    function withdraw(
+        uint256 pid
+    ) public whenNotPaused checkPid(pid) returns (bool) {
         Pool storage pool = _pool[pid];
         User storage user = _user[pid][_msgSender()];
         if (user.requestes.length == 0) {
@@ -276,9 +332,9 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
         uint256 popIndex;
         // 待提现总代币数
         uint256 sumWithdraw;
-        for(uint256 i = 0; i < user.requestes.length; i++) {
+        for (uint256 i = 0; i < user.requestes.length; i++) {
             Request memory req = user.requestes[i];
-            if(req.unlockBlocks > block.number) {
+            if (req.unlockBlocks > block.number) {
                 break;
             }
             sumWithdraw += req.amount;
@@ -290,19 +346,22 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
         for (uint i = 0; i < newLength; i++) {
             user.requestes[i] = user.requestes[popIndex + i];
         }
-        
+
         // 截断数组
         while (user.requestes.length > newLength) {
             user.requestes.pop();
         }
-        
+
         // 2 提现
-        if(sumWithdraw > 0) {
+        if (sumWithdraw > 0) {
             // 2.1 质押的ETH
-            if(pool.stTokenAddress == address(0)) {
+            if (pool.stTokenAddress == address(0)) {
                 _safeETHTransfer(_msgSender(), sumWithdraw);
-            }else {
-                IERC20(pool.stTokenAddress).safeTransfer(_msgSender(), sumWithdraw);
+            } else {
+                IERC20(pool.stTokenAddress).safeTransfer(
+                    _msgSender(),
+                    sumWithdraw
+                );
             }
             // 2.2 质押的ECR20
         }
@@ -315,24 +374,28 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
         payable(to).transfer(amount);
     }
 
-
     // 领取代币奖励
-    function claim(uint256 pid) public whenNotPaused checkPid(pid) returns(bool) {
+    function claim(
+        uint256 pid
+    ) public whenNotPaused checkPid(pid) returns (bool) {
         Pool storage pool = _pool[pid];
         User storage user = _user[pid][_msgSender()];
 
         // 更新，然后按照最新的系数领取
         updatePool(pid);
 
-        uint256 curPeedingToken = user.stAmount * pool.accRewardTokenPerST / (1 ether);
-        uint256 peedingToken =  curPeedingToken - user.finishedRewardToken + user.pendingRewardToken;
+        uint256 curPeedingToken = (user.stAmount * pool.accRewardTokenPerST) /
+            (1 ether);
+        uint256 peedingToken = curPeedingToken -
+            user.finishedRewardToken +
+            user.pendingRewardToken;
         console.log("user.stAmount: ", user.stAmount);
         console.log("pool.accRewardTokenPerST: ", pool.accRewardTokenPerST);
         console.log("curPeedingToken: ", curPeedingToken);
         console.log("finishedRewardToken: ", user.finishedRewardToken);
         console.log("pendingRewardToken: ", user.pendingRewardToken);
         console.log("peedingToken: ", peedingToken);
-        if(peedingToken > 0) {
+        if (peedingToken > 0) {
             _safeRewardTokenTransfer(_msgSender(), peedingToken);
         }
         user.finishedRewardToken = curPeedingToken;
@@ -342,7 +405,10 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
     }
 
     function _safeRewardTokenTransfer(address to, uint256 amount) internal {
-        require(amount < RewardToken.balanceOf(address(this)), "RewardToken balance not enough");
+        require(
+            amount < RewardToken.balanceOf(address(this)),
+            "RewardToken balance not enough"
+        );
         RewardToken.transfer(to, amount);
     }
 
@@ -360,9 +426,14 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
         uint256 unstakeLockedBlocks
     ) public returns (bool) {
         require(stTokenAddress != address(0), "invalid token address");
-        require(unstakeLockedBlocks > 0, "unstakeLockedBlocks must gether than 0");
+        require(
+            unstakeLockedBlocks > 0,
+            "unstakeLockedBlocks must gether than 0"
+        );
         require(block.number < _endBlock, "had stoped");
-        uint256 lastRewardBlock = block.number > _startBlock ? block.number : _startBlock;
+        uint256 lastRewardBlock = block.number > _startBlock
+            ? block.number
+            : _startBlock;
         _pool.push(
             Pool({
                 stTokenAddress: stTokenAddress,
@@ -386,7 +457,8 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
     function updatePool(uint pid) public {
         // require(pid < _pool.length - 1, "pid not exists");
         Pool storage pool = _pool[pid];
-        
+        console.log("block.number", block.number);
+        console.log("pool.lastRewardBlock", pool.lastRewardBlock);
         // 已是最新状态
         if (block.number <= pool.lastRewardBlock) {
             return;
@@ -399,10 +471,15 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
         }
         // 更新池中奖励
         // 新出区块产出的奖励token
-        uint256 allRewardToken = blockRewardToken(pool.lastRewardBlock, block.number);
+        uint256 allRewardToken = blockRewardToken(
+            pool.lastRewardBlock,
+            block.number
+        );
         console.log("allRewardToken: ", allRewardToken);
         // 根据权重，计算这个池的奖励。  精度因子，膨胀 1e18
-        uint256 poolRewardToken = allRewardToken * (pool.poolWeight / _totalPoolsWeight) * (1 ether);
+        uint256 poolRewardToken = allRewardToken *
+            (pool.poolWeight / _totalPoolsWeight) *
+            (1 ether);
         console.log("poolRewardToken: ", poolRewardToken);
 
         // 平均到每个代币的奖励
@@ -411,12 +488,15 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
         // 更新到池
         pool.accRewardTokenPerST += stTokenRewardToken;
         pool.lastRewardBlock = block.number;
-
+        console.log("pool.accRewardTokenPerST: ", pool.accRewardTokenPerST);
         // 更新区块事件
         emit UpdatePool(pid, pool.lastRewardBlock, stTokenRewardToken);
     }
 
-    function blockRewardToken(uint256 fromBlock, uint256 toBlock) internal view returns(uint256 rewardToken) {
+    function blockRewardToken(
+        uint256 fromBlock,
+        uint256 toBlock
+    ) internal view returns (uint256 rewardToken) {
         require(fromBlock <= toBlock, "invalid block range");
         // 与预设开始挖矿区块比较，取更高值
         fromBlock = fromBlock < _startBlock ? _startBlock : fromBlock;
@@ -426,12 +506,15 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
         console.log("toBlock: ", toBlock);
         console.log("fromBlock: ", fromBlock);
         console.log("_rewardTokenPerBlock: ", _rewardTokenPerBlock);
-        (success, rewardToken) = (toBlock - fromBlock).tryMul(_rewardTokenPerBlock);
+        (success, rewardToken) = (toBlock - fromBlock).tryMul(
+            _rewardTokenPerBlock
+        );
         require(success, "block range mul _rewardTokenPerBlock overflow");
     }
 
-    function _authorizeUpgrade(address) internal onlyRole(UPGRADE_ROLE) override {}
-
+    function _authorizeUpgrade(
+        address
+    ) internal override onlyRole(UPGRADE_ROLE) {}
 
     ///////////////admin fucntion////////////////////
 
@@ -498,23 +581,29 @@ contract MetaNodeStake is Initializable, UUPSUpgradeable, AccessControlUpgradeab
     }
 
     // 设置池权重
-    function setPoolWeight(uint256 pid, uint256 poolWeight) public onlyRole(ADMIN_ROLE) {
-        _totalPoolsWeight = _totalPoolsWeight - _pool[pid].poolWeight + poolWeight;
+    function setPoolWeight(
+        uint256 pid,
+        uint256 poolWeight
+    ) public onlyRole(ADMIN_ROLE) {
+        _totalPoolsWeight =
+            _totalPoolsWeight -
+            _pool[pid].poolWeight +
+            poolWeight;
         _pool[pid].poolWeight = poolWeight;
         emit SetPoolWeight(pid, poolWeight, _totalPoolsWeight);
     }
 
     ///////////////////////////查询接口/////////////////////////////////
     // 查询池数量
-    function poolLength() public view returns(uint256) {
+    function poolLength() public view returns (uint256) {
         return _pool.length;
     }
 
-    function startBlock() public view returns(uint256) {
+    function startBlock() public view returns (uint256) {
         return _startBlock;
     }
 
-    function endBlock() public view returns(uint256) {
+    function endBlock() public view returns (uint256) {
         return _endBlock;
     }
 }
